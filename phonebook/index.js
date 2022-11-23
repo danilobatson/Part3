@@ -39,7 +39,7 @@ const requestLogger = (request, response, next) => {
 
 app.use(express.static('build'));
 app.use(express.json());
-// app.use(requestLogger);
+app.use(requestLogger);
 app.use(cors());
 
 app.get('/', (req, res) => {
@@ -82,10 +82,21 @@ const generateId = () => {
   return maxId + 1;
 };
 
+
 app.post('/api/persons', (req, res) => {
   const body = req.body;
 
-  Person.findOneAndUpdate({ name: body.name }, { number: body.number }, {runValidators: true, context: 'query'}).then(
+  !body.name
+    ? res.status(400).json({ error: 'name missing' })
+    : !body.number
+    ? res.status(400).json({ error: 'number missing' })
+    : !body
+    ? res.status(400).json({ error: 'body missing' })
+    : body.name.length < 3
+    ? res.status(400).json({ error: 'name must be at least 3 characters long' })
+    : null;
+
+  Person.findOneAndUpdate({ name: body.name }, { number: body.number }).then(
     (persons) => {
       if (persons) {
         res.json(persons);
