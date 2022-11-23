@@ -38,7 +38,6 @@ app.use(requestLogger);
 app.use(cors());
 app.use(express.static('build'));
 
-
 app.get('/', (req, res) => {
   res.send('<h1>Hello World!</h1>');
 });
@@ -99,7 +98,7 @@ app.post('/api/persons', (req, res) => {
   res.json(person);
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const port = process.env.PORT || '8080';
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
