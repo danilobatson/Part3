@@ -1,6 +1,10 @@
 const express = require('express');
 const app = express();
 const cors = require('cors');
+const mongoose = require('mongoose');
+require('dotenv').config();
+
+const Person = require('./models/persons');
 
 let persons = [
   {
@@ -33,17 +37,19 @@ const requestLogger = (request, response, next) => {
   next();
 };
 
-app.use(express.json());
-app.use(requestLogger);
-app.use(cors());
 app.use(express.static('build'));
+app.use(express.json());
+// app.use(requestLogger);
+app.use(cors());
 
 app.get('/', (req, res) => {
   res.send('<h1>Hello World!</h1>');
 });
 
 app.get('/api/persons', (req, res) => {
-  res.json(persons);
+  Person.find({}).then((persons) => {
+    res.json(persons);
+  });
 });
 app.get('/info', (req, res) => {
   res.send(
@@ -51,20 +57,24 @@ app.get('/info', (req, res) => {
   );
 });
 
-app.get('/api/persons/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const person = persons.find((person) => person.id === id);
-  if (person) {
-    res.json(person);
-  } else {
-    res.status(404).end();
-  }
+app.get('/api/persons/:id', (req, res, next) => {
+  Person.findById(req.params.id)
+    .then((person) => {
+      if (person) {
+        res.json(person);
+      } else {
+        res.status(404).end();
+      }
+    })
+    .catch((error) => next(error));
 });
 
-app.delete('/api/persons/:id', (req, res) => {
-  const id = Number(req.params.id);
-  persons = persons.filter((person) => person.id !== id);
-  res.status(204).end();
+app.delete('/api/persons/:id', (req, res, next) => {
+  Person.findByIdAndRemove(req.params.id)
+    .then((result) => {
+      res.status(204).end();
+    })
+    .catch((error) => next(error));
 });
 
 const generateId = () => {
@@ -74,6 +84,7 @@ const generateId = () => {
 
 app.post('/api/persons', (req, res) => {
   const body = req.body;
+  console.log(body);
   if (!body.name) {
     return res.status(400).json({
       error: 'name missing',
@@ -84,21 +95,42 @@ app.post('/api/persons', (req, res) => {
       error: 'number missing',
     });
   }
-  if (persons.find((person) => person.name === body.name)) {
-    return res.status(400).json({
-      error: 'name must be unique',
-    });
-  }
-  const person = {
-    name: body.name,
-    number: body.number,
-    id: generateId(),
-  };
-  persons = persons.concat(person);
-  res.json(person);
+
+  Person.findOneAndUpdate({ name: body.name }, { number: body.number }).then(
+    (persons) => {
+      if (persons) {
+        res.json(persons);
+      } else {
+        const person = new Person({
+          name: body.name,
+          number: body.number,
+        });
+        person.save().then((savedPerson) => {
+          res.json(savedPerson);
+        });
+      }
+    }
+  );
 });
 
-const port = process.env.PORT || '8080';
+const unknownEndpoint = (request, response) => {
+  response.status(404).send({ error: 'unknown endpoint' });
+};
+app.use(unknownEndpoint);
+
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message);
+
+  if (error.name === 'CastError') {
+    return response.status(400).send({ error: 'malformatted id' });
+  }
+
+  next(error);
+};
+
+app.use(errorHandler);
+
+const port = process.env.PORT;
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
